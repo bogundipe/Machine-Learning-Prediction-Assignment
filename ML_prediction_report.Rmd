@@ -1,0 +1,146 @@
+---
+title: "Machine Learning Assignment - Prediction Exercise"
+author: "Bolaji Ogundipe"
+date: "12/1/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Synopsis
+This project work is part of exxercise to fulfill requirement of Machine Learning course 
+part of coursera Data Science Specializaton program. It aim to predict the manner in which 
+6 participant, with data from accelerometers on the belt, forearm, arm, and dumbell quantifies 
+how well of a particular activity they do. This is the "classe" variable in the trainng set.
+The prediction model (algorithm) are applied to predict 20 different test cases available in the 
+test data and submited in appropriate format to the Coursera Project Prediction Quiz for 
+automated grading.
+
+## Background to study
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal
+activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take
+activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take
+geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well
+they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6
+participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available
+from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on
+the Weight Lifting Exercise Dataset).
+
+## Exploratory Analysis of Data
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data is from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. 
+
+But for the generousity of Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. 
+Qualitative Activity Recognition of Weight Lifting Exercises. 
+Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+There would'nt have been this data to perform this analysis. I thank you guys!
+
+## General overview of the data by the author;
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different 
+fashions: exactly according to the specification (Class A), throwing the elbows to the f(Class B), lifting the dumbbell only halfway 
+(Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. 
+Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were supposed to simulate. 
+The exercises were performed by six male participants aged between 20-28 years, with little weight lifting experience. We made sure that all 
+participants could easily simulate the mistakes in a safe and controlled manner by using a relatively light dumbbell (1.25kg).
+
+## Setting work environment
+```{r, echo=TRUE}
+setwd("~/DScoursera/Machine Learning/ML project_work")
+set.seed(12345)
+library(caret)
+library(corrplot)
+library(rattle)
+library(randomForest)
+library(mice)
+library(knitr)
+library(rpart.plot)
+library(rpart)
+```
+## Loading and Cleaning Data 
+```{r, echo=TRUE}
+urlTrain <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+urlTest <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training <- read.csv(url(urlTrain))
+test <- read.csv(url(urlTest))
+
+inTrain <- createDataPartition(training$classe, p=0.7, list = FALSE)
+
+train <- training[inTrain, ]
+test <- training[-inTrain, ]
+
+dim(train)
+dim(test)
+
+#removing almost zero variables
+NZV <- nearZeroVar(train)
+train <- train[, -NZV]
+test <- test[, -NZV]
+
+dim(train)
+dim(test)
+
+#removing Na values
+NAs <- sapply(train, function(x) mean(is.na(x))) >0.95
+train <- train[, NAs==FALSE]
+test <- test[, NAs==FALSE]
+
+dim(train)
+dim(test)
+
+#removing variables use for identification only
+train <- train[, -(1:5)]
+test <- test[, -(1:5)]
+
+dim(train)
+dim(test)
+```
+Cleaning procedure reduced the variables to 54. Below is correlation matrix of the varibles. In the graph, dark-color areas shows the highly correlated variables. I would have carried out a PCA to further reduce the number of variables but it is few variables that are highly correlated in this case.
+```{r, echo=TRUE}
+corMatrix <- cor(train[, -54])
+corrplot(corMatrix, order = "FPC", method = "circle", type = "full", tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+```
+## Prediction Models
+*Random Forest*
+```{r, echo=TRUE}
+set.seed(3245)
+controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+
+modfitRF <- train(classe ~., data=train, method = "rf", trControl = controlRF)
+
+modfitRF$finalModel
+
+#prediction on test data
+predictRF <- predict(modfitRF, newdata = test)
+confmat <- confusionMatrix(predictRF, test$classe)
+confmat
+```
+*Decision Tree*
+```{r, echo=TRUE}
+set.seed(3245)
+modfitDT <- rpart(classe ~., data = train, method = "class")
+fancyRpartPlot(modfitDT)
+```
+predict on test data
+```{r, echo=TRUE}
+predictDT <- predict(modfitDT, newdata = test, type = "class")
+confmatDT <- confusionMatrix(predictDT, test$classe)
+confmatDT
+```
+apply model to data
+```{r, echo=TRUE}
+predictTest <- predict(modfitRF, newdata = test)
+predictTest
+```
